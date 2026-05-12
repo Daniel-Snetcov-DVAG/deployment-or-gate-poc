@@ -30,9 +30,9 @@ In this repo that means:
 ## Workflows
 
 - `CI`: basic PR sanity check
-- `Simulate entwicklung deployment`: creates a successful deployment for `entwicklung`
-- `Simulate d0x deployment`: creates a successful deployment for one of `d01` to `d05`
-- `Pre-dev deployment gate`: watches PR updates and deployment status events, then sets `pre-dev-deployment`
+- `Simulate entwicklung deployment`: deploys the latest commit from a provided branch into `entwicklung`
+- `Simulate d0x deployment`: deploys the latest commit from a provided branch into one of `d01` to `d05`
+- `Pre-dev deployment gate`: seeds the gate on PR updates and allows manual status backfills when needed
 
 ## Demo Flow
 
@@ -62,9 +62,9 @@ Deploy a PR branch to `d01`:
 
 ```bash
 gh workflow run "Simulate d0x deployment" \
-  --repo dvag/deployment-or-gate-poc \
+  --repo Daniel-Snetcov-DVAG/deployment-or-gate-poc \
   --ref main \
-  -f target_ref=feature/alice \
+  -f target_branch=feature/alice \
   -f d0x=d01
 ```
 
@@ -72,13 +72,13 @@ Deploy a PR branch to `entwicklung`:
 
 ```bash
 gh workflow run "Simulate entwicklung deployment" \
-  --repo dvag/deployment-or-gate-poc \
+  --repo Daniel-Snetcov-DVAG/deployment-or-gate-poc \
   --ref main \
-  -f target_ref=feature/alice
+  -f target_branch=feature/alice
 ```
 
 Create the demo environments after the repo exists:
 
 ```bash
-./scripts/bootstrap-environments.sh dvag/deployment-or-gate-poc
+./scripts/bootstrap-environments.sh Daniel-Snetcov-DVAG/deployment-or-gate-poc
 ```
