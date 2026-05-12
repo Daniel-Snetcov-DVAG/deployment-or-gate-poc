@@ -76,3 +76,9 @@ gh workflow run "Simulate entwicklung deployment" \
   --ref main \
   -f target_ref=feature/alice
 ```
+
+Create the demo environments after the repo exists:
+
+```bash
+./scripts/bootstrap-environments.sh dvag/deployment-or-gate-poc
+```
