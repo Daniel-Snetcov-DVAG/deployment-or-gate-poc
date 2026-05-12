@@ -18,6 +18,10 @@ on:
           - d04
           - d05
 
+concurrency:
+  group: deploy-${{ inputs.d0x }}
+  cancel-in-progress: false
+
 permissions:
   contents: read
   deployments: write
