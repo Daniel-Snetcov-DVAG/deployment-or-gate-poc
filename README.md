@@ -34,6 +34,8 @@ In this repo that means:
 - `Simulate d0x deployment`: deploys the latest commit from the branch selected via GitHub's `Use workflow from` into one of `d01` to `d05`
 - `Pre-dev deployment gate`: seeds the gate on PR updates and allows manual status backfills when needed
 
+Detailed flowcharts live in [docs/flowcharts.md](docs/flowcharts.md).
+
 ## Demo Flow
 
 1. Create two branches and open two PRs against `main`.
