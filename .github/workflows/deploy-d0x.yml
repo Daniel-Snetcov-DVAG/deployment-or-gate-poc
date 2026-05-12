@@ -3,10 +3,6 @@ name: Simulate d0x deployment
 on:
   workflow_dispatch:
     inputs:
-      target_branch:
-        description: Branch to deploy. The workflow always uses the latest commit on this branch.
-        required: true
-        type: string
       d0x:
         description: Which d0x lane to deploy
         required: true
@@ -33,26 +29,13 @@ jobs:
     runs-on: ubuntu-latest
     env:
       DEPLOY_ENVIRONMENT: ${{ inputs.d0x }}
-      TARGET_BRANCH: ${{ inputs.target_branch }}
+      TARGET_SHA: ${{ github.sha }}
+      TARGET_BRANCH: ${{ github.ref_name }}
     steps:
       - uses: actions/checkout@v4
-      - name: Resolve latest branch SHA
-        id: resolve-target
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const response = await github.rest.repos.getBranch({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              branch: process.env.TARGET_BRANCH,
-            })
-
-            core.setOutput('target_sha', response.data.commit.sha)
       - name: Create deployment
         id: create-deployment
         uses: actions/github-script@v7
-        env:
-          TARGET_SHA: ${{ steps.resolve-target.outputs.target_sha }}
         with:
           script: |
             const owner = context.repo.owner
@@ -72,7 +55,9 @@ jobs:
             })
 
             core.setOutput('deployment_id', String(response.data.id))
-            core.info(`Created deployment ${response.data.id} for ${ref} in ${environment}`)
+            core.info(
+              `Created deployment ${response.data.id} for ${ref} from branch ${process.env.TARGET_BRANCH} in ${environment}`
+            )
       - name: Simulate deployment work
         run: sleep 3
       - name: Mark deployment successful
@@ -162,5 +147,5 @@ jobs:
       - name: Sync pre-dev deployment gate
         uses: ./.github/actions/sync-predev-status
         with:
-          target-sha: ${{ steps.resolve-target.outputs.target_sha }}
+          target-sha: ${{ env.TARGET_SHA }}
           affected-environment: ${{ env.DEPLOY_ENVIRONMENT }}

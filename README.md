@@ -30,8 +30,8 @@ In this repo that means:
 ## Workflows
 
 - `CI`: basic PR sanity check
-- `Simulate entwicklung deployment`: deploys the latest commit from a provided branch into `entwicklung`
-- `Simulate d0x deployment`: deploys the latest commit from a provided branch into one of `d01` to `d05`
+- `Simulate entwicklung deployment`: deploys the latest commit from the branch selected via GitHub's `Use workflow from`
+- `Simulate d0x deployment`: deploys the latest commit from the branch selected via GitHub's `Use workflow from` into one of `d01` to `d05`
 - `Pre-dev deployment gate`: seeds the gate on PR updates and allows manual status backfills when needed
 
 ## Demo Flow
@@ -63,18 +63,23 @@ Deploy a PR branch to `d01`:
 ```bash
 gh workflow run "Simulate d0x deployment" \
   --repo Daniel-Snetcov-DVAG/deployment-or-gate-poc \
-  --ref main \
-  -f target_branch=feature/alice \
+  --ref feature/alice \
   -f d0x=d01
 ```
+
+Or in the GitHub UI:
+
+1. Open the workflow in Actions.
+2. Click `Run workflow`.
+3. In `Use workflow from`, select `feature/alice`.
+4. Choose `d01`.
 
 Deploy a PR branch to `entwicklung`:
 
 ```bash
 gh workflow run "Simulate entwicklung deployment" \
   --repo Daniel-Snetcov-DVAG/deployment-or-gate-poc \
-  --ref main \
-  -f target_branch=feature/alice
+  --ref feature/alice
 ```
 
 Create the demo environments after the repo exists:
