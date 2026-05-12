@@ -1,0 +1,69 @@
+name: Simulate entwicklung deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_ref:
+        description: Branch name or commit SHA to deploy
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  deployments: write
+
+jobs:
+  deploy:
+    name: deploy-entwicklung
+    runs-on: ubuntu-latest
+    env:
+      DEPLOY_ENVIRONMENT: entwicklung
+      TARGET_REF: ${{ inputs.target_ref }}
+    steps:
+      - name: Create deployment
+        id: create-deployment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner
+            const repo = context.repo.repo
+            const ref = process.env.TARGET_REF
+            const environment = process.env.DEPLOY_ENVIRONMENT
+            const response = await github.rest.repos.createDeployment({
+              owner,
+              repo,
+              ref,
+              environment,
+              description: `POC deployment to ${environment}`,
+              auto_merge: false,
+              required_contexts: [],
+              production_environment: false,
+              transient_environment: true,
+            })
+
+            core.setOutput('deployment_id', String(response.data.id))
+            core.info(`Created deployment ${response.data.id} for ${ref} in ${environment}`)
+      - name: Simulate deployment work
+        run: sleep 3
+      - name: Mark deployment successful
+        uses: actions/github-script@v7
+        env:
+          DEPLOYMENT_ID: ${{ steps.create-deployment.outputs.deployment_id }}
+        with:
+          script: |
+            const owner = context.repo.owner
+            const repo = context.repo.repo
+            const deploymentId = Number(process.env.DEPLOYMENT_ID)
+            const environment = process.env.DEPLOY_ENVIRONMENT
+            const runUrl =
+              `${process.env.GITHUB_SERVER_URL}/${owner}/${repo}/actions/runs/${process.env.GITHUB_RUN_ID}`
+
+            await github.rest.repos.createDeploymentStatus({
+              owner,
+              repo,
+              deployment_id: deploymentId,
+              state: 'success',
+              log_url: runUrl,
+              environment_url: `https://example.invalid/${environment}`,
+              auto_inactive: true,
+            })

@@ -1,0 +1,132 @@
+name: Pre-dev deployment gate
+
+on:
+  pull_request_target:
+    branches:
+      - main
+    types:
+      - opened
+      - reopened
+      - synchronize
+  deployment_status:
+
+permissions:
+  contents: read
+  deployments: read
+  pull-requests: read
+  statuses: write
+
+env:
+  PREDEV_STATUS_CONTEXT: pre-dev-deployment
+  ALLOWED_PREDEV_ENVIRONMENTS: >-
+    ["entwicklung","d01","d02","d03","d04","d05"]
+
+jobs:
+  sync-predev-status:
+    name: sync-predev-status
+    runs-on: ubuntu-latest
+    steps:
+      - name: Aggregate allowed pre-dev deployments
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const allowed = JSON.parse(process.env.ALLOWED_PREDEV_ENVIRONMENTS)
+            const owner = context.repo.owner
+            const repo = context.repo.repo
+            const isPullRequestEvent = context.eventName === 'pull_request_target'
+            const sha = isPullRequestEvent
+              ? context.payload.pull_request.head.sha
+              : context.payload.deployment.sha
+            const eventEnvironment =
+              context.payload.deployment_status?.environment ??
+              context.payload.deployment?.environment
+
+            if (!isPullRequestEvent && !allowed.includes(eventEnvironment)) {
+              core.info(`Ignoring deployment status for ${eventEnvironment}`)
+              return
+            }
+
+            async function latestDeploymentState(environment) {
+              const deployments = await github.paginate(
+                github.rest.repos.listDeployments,
+                {
+                  owner,
+                  repo,
+                  sha,
+                  environment,
+                  per_page: 100,
+                }
+              )
+
+              deployments.sort((left, right) => {
+                return Date.parse(right.created_at) - Date.parse(left.created_at)
+              })
+
+              for (const deployment of deployments) {
+                const statuses = await github.paginate(
+                  github.rest.repos.listDeploymentStatuses,
+                  {
+                    owner,
+                    repo,
+                    deployment_id: deployment.id,
+                    per_page: 100,
+                  }
+                )
+
+                if (!statuses.length) {
+                  continue
+                }
+
+                statuses.sort((left, right) => {
+                  return Date.parse(right.created_at) - Date.parse(left.created_at)
+                })
+
+                return statuses[0].state
+              }
+
+              return null
+            }
+
+            const statesByEnvironment = {}
+
+            for (const environment of allowed) {
+              statesByEnvironment[environment] =
+                await latestDeploymentState(environment)
+            }
+
+            const successfulEnvironments = Object.entries(statesByEnvironment)
+              .filter(([, state]) => state === 'success')
+              .map(([environment]) => environment)
+            const pendingEnvironments = Object.entries(statesByEnvironment)
+              .filter(([, state]) => ['pending', 'queued', 'in_progress'].includes(state))
+              .map(([environment]) => environment)
+            const failedEnvironments = Object.entries(statesByEnvironment)
+              .filter(([, state]) => ['failure', 'error'].includes(state))
+              .map(([environment]) => environment)
+
+            let statusState = 'pending'
+            let description =
+              'Deploy this SHA to entwicklung or any d0x environment before merging.'
+
+            if (successfulEnvironments.length) {
+              statusState = 'success'
+              description = `Deployment succeeded in ${successfulEnvironments[0]}.`
+            } else if (pendingEnvironments.length) {
+              description = `Deployment is running in ${pendingEnvironments[0]}.`
+            } else if (failedEnvironments.length) {
+              statusState = 'failure'
+              description = `Deployment failed in ${failedEnvironments[0]}.`
+            }
+
+            const targetUrl =
+              `${process.env.GITHUB_SERVER_URL}/${owner}/${repo}/actions/runs/${process.env.GITHUB_RUN_ID}`
+
+            await github.rest.repos.createCommitStatus({
+              owner,
+              repo,
+              sha,
+              state: statusState,
+              context: process.env.PREDEV_STATUS_CONTEXT,
+              description,
+              target_url: targetUrl,
+            })
