@@ -93,6 +93,68 @@ jobs:
               environment_url: `https://example.invalid/${environment}`,
               auto_inactive: true,
             })
+      - name: Inactivate previous deployments in this lane
+        uses: actions/github-script@v7
+        env:
+          CURRENT_DEPLOYMENT_ID: ${{ steps.create-deployment.outputs.deployment_id }}
+        with:
+          script: |
+            const owner = context.repo.owner
+            const repo = context.repo.repo
+            const currentDeploymentId = Number(process.env.CURRENT_DEPLOYMENT_ID)
+            const environment = process.env.DEPLOY_ENVIRONMENT
+            const runUrl =
+              `${process.env.GITHUB_SERVER_URL}/${owner}/${repo}/actions/runs/${process.env.GITHUB_RUN_ID}`
+
+            const deployments = await github.paginate(
+              github.rest.repos.listDeployments,
+              {
+                owner,
+                repo,
+                environment,
+                per_page: 100,
+              }
+            )
+
+            deployments.sort((left, right) => {
+              return Date.parse(right.created_at) - Date.parse(left.created_at)
+            })
+
+            for (const deployment of deployments) {
+              if (deployment.id === currentDeploymentId) {
+                continue
+              }
+
+              const statuses = await github.paginate(
+                github.rest.repos.listDeploymentStatuses,
+                {
+                  owner,
+                  repo,
+                  deployment_id: deployment.id,
+                  per_page: 100,
+                }
+              )
+
+              statuses.sort((left, right) => {
+                return Date.parse(right.created_at) - Date.parse(left.created_at)
+              })
+
+              const latestState = statuses[0]?.state
+
+              if (!latestState || ['inactive', 'failure', 'error'].includes(latestState)) {
+                continue
+              }
+
+              await github.rest.repos.createDeploymentStatus({
+                owner,
+                repo,
+                deployment_id: deployment.id,
+                state: 'inactive',
+                log_url: runUrl,
+                environment_url: `https://example.invalid/${environment}`,
+                auto_inactive: false,
+              })
+            }
       - name: Sync pre-dev deployment gate
         uses: ./.github/actions/sync-predev-status
         with:
